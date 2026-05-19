@@ -1,0 +1,8 @@
+[general]
+log_level = "DEBUG"
+TLE_URL = "https://live.ariss.org/iss.txt"
+
+
+[coordinates]
+latitude = 55.930591
+longitude = 37.498435

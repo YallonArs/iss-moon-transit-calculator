@@ -1,7 +1,9 @@
 import asyncio
-import aiofiles
 from loguru import logger
-from tqdm.asyncio import trange, tqdm
+from tqdm.asyncio import trange
+from tqdm import tqdm
+
+from datetime import datetime
 
 import astropy.coordinates
 from astropy.coordinates import Angle, SkyCoord, EarthLocation, get_body
@@ -59,7 +61,7 @@ async def calculate_distance(t: Time, geo: EarthLocation) -> Angle:
 
 	iss = await get_iss(t)
 
-	iss_TETE = await transform_TEME_to_TETE(iss, geo)
+	iss_TETE = await transform_TEME_to_TETE(await get_iss(t), geo)
 	iss_altaz = transform_to_altaz(iss_TETE, geo)
 
 	angle = moon_altaz.separation(iss_altaz)
@@ -83,19 +85,28 @@ async def _iteration(t: Time, geo: EarthLocation, file):
 
 
 async def main():
-	# datetime_obj = datetime(2026, 5, 19, 22, 56, 0, tzinfo=astropy.time.TimezoneInfo(3 * u.hour))
+	entries: list[tuple[Time, float]] = []
 
-	# time = Time(datetime_obj)
-	time = Time.now()
-	print(time)
+	with open("output.txt") as file:
+		for line in tqdm(file.readlines()):
+			datetime_str, elevation_str = line.strip().rstrip().split(" - ")
+			datetime_obj = datetime.strptime(datetime_str, "%Y-%m-%d %H:%M:%S.%f")
+			time_entry = Time(datetime_obj)
+			distance_entry = float(elevation_str.removesuffix(" deg"))
 
+			entries.append((time_entry, distance_entry))
+	
 	earth_location = await get_Earth_Location(app_config.coordinates.latitude, app_config.coordinates.longitude)
-	# new_coord = await transform_TEME_to_TETE(await get_iss(time), earth_location)
-	# print(transform_to_altaz(new_coord, earth_location))
 
-	async with aiofiles.open("output.txt", "w") as file:
-		async for i in trange(0, 3600 * 24 * 30 * 12 // 10):
-			t = time + i * 10 * u.second
-			await _iteration(t, earth_location, file)
+	selected_entries: list[tuple[Time, float]] = []
+	for t, distance in tqdm(entries):
+		moon = get_body('moon', t)
+		moon_altaz = transform_to_altaz(moon, earth_location)
+		if moon_altaz.alt > 0:
+			selected_entries.append((t, distance))
+
+	with open("output_filter.txt", "w") as file:
+		for t, distance in selected_entries:
+			file.write(f"{t.iso} - {distance:.2f}\n")
 
 asyncio.run(main())

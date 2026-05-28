@@ -1,10 +1,8 @@
 astropy
-asyncio
-aiohttp
-aiofiles
 sgp4
 loguru
 dataclasses
 pydantic
 tqdm
 async-cache
+requests

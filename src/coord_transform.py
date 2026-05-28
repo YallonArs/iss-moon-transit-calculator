@@ -6,7 +6,7 @@ __all__ = [
 ]
 
 
-async def transform_TEME_to_TETE(coord: SkyCoord, geo: EarthLocation) -> SkyCoord:
+def transform_TEME_to_TETE(coord: SkyCoord, geo: EarthLocation) -> SkyCoord:
 	obstime = coord.obstime
 
 	# 2. Transform TEME to geocentric ITRS

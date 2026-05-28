@@ -1,7 +1,10 @@
 [general]
 log_level = "DEBUG"
-TLE_URL = "https://live.ariss.org/iss.txt"
+use_elevation = true
 
+[endpoints]
+TLE_URL = "https://live.ariss.org/iss.txt"
+ELEVATION_URL = "https://api.open-meteo.com/v1/elevation?latitude={lat}&longitude={lon}"
 
 [coordinates]
 latitude = 55.930591

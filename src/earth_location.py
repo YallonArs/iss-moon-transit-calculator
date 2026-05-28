@@ -1,23 +1,38 @@
 import astropy.coordinates
-import astropy.units as u
-import aiohttp
 from loguru import logger
+import requests
+from src.config import AppConfig
 
 
-async def get_elevation(lat: float, lon: float) -> float:
-	async with aiohttp.ClientSession() as session:
-		url = f"https://api.open-meteo.com/v1/elevation?latitude={lat}&longitude={lon}"
-		async with session.get(url) as response:
-			if response.status != 200:
-				logger.error(f"Failed to get elevation data: {response.status}")
-				raise Exception(f"Failed to get elevation data: {response.status}")
-			
-			data = await response.json()
-			return data['elevation'][0] * u.m
+def get_elevation(elevation_url: str, lat: float, lon: float) -> float:
+	"""
+	Fetches the elevation for the given latitude and longitude using the specified elevation API URL.
+
+	Returns results in meters. 
+	
+	Raises an requests.RequestException if the request fails or if the response cannot be parsed.
+	"""
+
+	response = requests.get(elevation_url.format(lat=lat, lon=lon))
+
+	if response.status_code != 200:
+		logger.error(f"Failed to get elevation data: {response.status_code}")
+		raise requests.RequestException(f"Failed to get elevation data: {response.status_code}")
+	
+	try:
+		data = response.json()
+	except requests.exceptions.JSONDecodeError as e:
+		logger.error(f"Failed to parse elevation data: {e}")
+		raise requests.RequestException(f"Failed to parse elevation data: {e}")
+
+	return data["elevation"][0]
 
 
-async def get_Earth_Location(lat: float, lon: float) -> astropy.coordinates.EarthLocation:
-	elevation = await get_elevation(lat, lon)
+def get_Earth_Location(config: AppConfig, lat: float, lon: float) -> astropy.coordinates.EarthLocation:
+	if config.general.use_elevation:
+		elevation = get_elevation(str(config.endpoints.ELEVATION_URL), lat, lon)
+	else:
+		elevation = 0
 
 	return astropy.coordinates.EarthLocation.from_geodetic(
 		lon = lon,

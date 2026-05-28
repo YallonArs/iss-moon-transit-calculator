@@ -14,7 +14,7 @@ from sgp4.api import Satrec
 
 from src.coord_transform import *
 from src.earth_location import get_Earth_Location
-from src.parser import load_config
+from src.config import load_config
 from src.tle import TLE, download_tle
 
 

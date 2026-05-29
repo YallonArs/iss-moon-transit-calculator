@@ -25,6 +25,8 @@ def get_elevation(elevation_url: str, lat: float, lon: float) -> float:
 		logger.error(f"Failed to parse elevation data: {e}")
 		raise requests.RequestException(f"Failed to parse elevation data: {e}")
 
+	logger.debug(f"Elevation data: {data}")
+
 	return data["elevation"][0]
 
 
@@ -34,8 +36,12 @@ def get_Earth_Location(config: AppConfig, lat: float, lon: float) -> astropy.coo
 	else:
 		elevation = 0
 
-	return astropy.coordinates.EarthLocation.from_geodetic(
+	geo = astropy.coordinates.EarthLocation.from_geodetic(
 		lon = lon,
 		lat = lat,
 		height = elevation
 	)
+
+	logger.debug(f"Earth Location: {repr(geo)}")
+
+	return geo

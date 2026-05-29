@@ -1,11 +1,14 @@
 import tomllib
 from typing import Optional
 from pydantic import BaseModel, HttpUrl, model_validator
+import os
 
 
 class GeneralConfig(BaseModel):
 	log_level: str = "DEBUG"
 	use_elevation: bool = True
+	num_workers: int = os.cpu_count()
+	timezone: int = 0
 
 class EndpointsConfig(BaseModel):
 	TLE_URL: HttpUrl

@@ -1,6 +1,8 @@
 [general]
 log_level = "DEBUG"
 use_elevation = true
+num_workers = 12
+timezone = +3
 
 [endpoints]
 TLE_URL = "https://live.ariss.org/iss.txt"

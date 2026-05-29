@@ -2,12 +2,15 @@ from typing import Iterable
 
 import astropy
 from loguru import logger
+from tqdm import tqdm
+from multiprocessing import Pool
+from functools import partial
+from time import time
+import sys
 
 from astropy.coordinates import Angle, SkyCoord, EarthLocation, get_body
 from astropy.time import Time
 import astropy.units as u
-
-from tqdm import tqdm
 
 import numpy as np
 from sgp4.api import Satrec
@@ -52,7 +55,7 @@ def calculate_distance(object1, object2, geo: EarthLocation) -> Angle:
 	return angle
 
 
-def calculate(tle: TLE, t: Time, geo: EarthLocation):
+def calculate(t: Time, tle: TLE, geo: EarthLocation):
 	moon = get_body("moon", t, geo)
 
 	iss = get_iss(tle, t)
@@ -62,20 +65,27 @@ def calculate(tle: TLE, t: Time, geo: EarthLocation):
 
 
 def postprocess(angles: Iterable[Angle], ts: Iterable[Time], file):
-	for angle, t in tqdm(zip(angles, ts)):
+	for angle, t in tqdm(zip(angles, ts), total=len(angles), desc="Postprocessing"):
 		# if angle < 15 * u.degree:
 		# 	logger.info(f"ISS is close to the Moon! Angle: {angle:.2f}")
 		# 	file.write(f"{t.iso} - {angle:.2f}\n")
 
-		if angle < 0.25 * u.degree:
-			logger.warning(f"ISS is very close to the Moon! Angle: {angle:.2f}")
+		if angle < 0.5 * u.degree:
+			sys.stdout.write('\x1b[1A')
+			sys.stdout.write('\x1b[2K')
+			print("\r", end="")
+
+			logger.warning(f"ISS is very close to the Moon! ({t.iso}) Angle: {angle:.2f}")
 			file.write(f"{t.iso} - {angle:.2f}\n")
 
 
 def main():
 	logger.info("Downloading TLE...")
 	tle = download_tle(str(config.endpoints.TLE_URL))
+	
 	current_time = Time.now()
+	current_time = current_time + config.general.timezone * u.hour
+	logger.info(f"Current time: {current_time} (time zone: UTC{config.general.timezone:+d})")
 
 	logger.info("Getting Earth Location...")
 	earth_location = get_Earth_Location(config, config.coordinates.latitude, config.coordinates.longitude)
@@ -84,15 +94,30 @@ def main():
 	logger.info("Building array of times...")
 	times = current_time + np.arange(0, stop_seconds, 10) * u.second
 
-	logger.info("Calculating angles...")
-	angles = calculate(tle, times, earth_location)
+	logger.debug(f"Total number of time points: {len(times)}")
+
+	logger.info("Splitting array of times into chunks...")
+	# Split times into chunks for parallel processing
+	chunk_size = len(times) // config.general.num_workers
+	time_chunks = [times[i:i + chunk_size] for i in range(0, len(times), chunk_size)]
+
+	logger.info(f"Calculating angles using {config.general.num_workers} workers...")
+	t1 = time()
+	with Pool(config.general.num_workers) as pool:
+		chunk_results = pool.map(
+			partial(calculate, tle=tle, geo=earth_location),
+			time_chunks
+		)
+	t2 = time()
+	logger.info(f"Angle calculation completed in {t2 - t1:.2f} seconds.")
+	logger.info(f"Average performance: {len(times) / (t2 - t1):.4f} it/s.")
+	
+	# Concatenate results
+	angles = np.concatenate(chunk_results)
 
 	logger.info("Postprocessing results...")
 	with open("output.txt", "w") as file:
 		postprocess(angles, times, file)
-
-	print(len(times))
-
 
 	# with open("output.txt", "w") as file:
 	# 	for i in range(0, len(times)):
